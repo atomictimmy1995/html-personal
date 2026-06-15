@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Practice Logger</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --panel: #1a1d27;
+      --panel-2: #232734;
+      --accent: #4f9dff;
+      --accent-2: #ffb454;
+      --text: #e6e8ee;
+      --muted: #9aa0ad;
+      --good: #51cf66;
+      --bad: #ff6b6b;
+      --border: #2c3140;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    header {
+      padding: 24px 20px 12px;
+      text-align: center;
+    }
+
+    header h1 { margin: 0; font-size: 1.8rem; }
+    header p { margin: 4px 0 0; color: var(--muted); }
+
+    .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 12px 16px 60px;
+      display: grid;
+      gap: 18px;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+
+    .card.full { grid-column: 1 / -1; }
+
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Timer */
+    .timer-display {
+      font-size: 3.4rem;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      font-weight: 600;
+      letter-spacing: 2px;
+      margin: 6px 0 14px;
+    }
+
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .row.center { justify-content: center; }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 9px 16px;
+      border-radius: 8px;
+      transition: background .15s, transform .05s;
+    }
+    button:hover { background: #2c3242; }
+    button:active { transform: translateY(1px); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #06121f; font-weight: 600; }
+    button.primary:hover { background: #6cb0ff; }
+    button.warn { background: var(--accent-2); border-color: var(--accent-2); color: #2a1c00; font-weight: 600; }
+    button.danger { color: var(--bad); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+
+    label { display: block; font-size: .82rem; color: var(--muted); margin-bottom: 4px; }
+
+    input[type="text"], textarea, select {
+      width: 100%;
+      font: inherit;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    textarea { resize: vertical; min-height: 90px; }
+
+    .field { margin-bottom: 12px; }
+
+    /* Metronome */
+    .met-bpm {
+      font-size: 2.6rem;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .met-bpm small { font-size: .9rem; color: var(--muted); font-weight: 400; }
+
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+    .beats { display: flex; gap: 8px; justify-content: center; margin: 14px 0; }
+    .beat {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--panel-2); border: 1px solid var(--border);
+    }
+    .beat.on { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+    .beat.accent.on { background: var(--accent-2); box-shadow: 0 0 12px var(--accent-2); }
+
+    /* Recordings & log lists */
+    ul.list { list-style: none; margin: 0; padding: 0; }
+    ul.list li {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .li-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .li-title { font-weight: 600; }
+    .li-meta { color: var(--muted); font-size: .8rem; }
+    .li-notes { color: var(--muted); font-size: .88rem; margin-top: 4px; white-space: pre-wrap; }
+    audio { width: 100%; margin-top: 8px; }
+
+    .empty { color: var(--muted); font-style: italic; font-size: .9rem; }
+
+    .stats { display: flex; gap: 18px; flex-wrap: wrap; }
+    .stat { flex: 1; min-width: 120px; text-align: center; }
+    .stat .num { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+    .stat .lbl { color: var(--muted); font-size: .8rem; }
+
+    .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--bad); display: inline-block; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+
+    .toolbar-link { display: inline-block; margin-top: 10px; color: var(--accent); text-decoration: none; }
+    .toolbar-link:hover { text-decoration: underline; }
+
+    @media (max-width: 680px) {
+      .wrap { grid-template-columns: 1fr; }
+      .timer-display { font-size: 2.8rem; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>🎺 Practice Logger</h1>
+    <p>Track your practice time, take notes, record yourself, and keep tempo.</p>
+  </header>
+
+  <div class="wrap">
+
+    <!-- TIMER -->
+    <section class="card" id="timer-card">
+      <h2>⏱️ Practice Timer</h2>
+      <div class="timer-display" id="timerDisplay">00:00:00</div>
+      <div class="row center">
+        <button class="primary" id="startBtn">Start</button>
+        <button id="pauseBtn" disabled>Pause</button>
+        <button class="warn" id="finishBtn" disabled>Finish &amp; Log</button>
+      </div>
+    </section>
+
+    <!-- METRONOME -->
+    <section class="card" id="met-card">
+      <h2>🎵 Metronome</h2>
+      <div class="met-bpm"><span id="bpmVal">90</span> <small>BPM</small></div>
+      <input type="range" id="bpmSlider" min="30" max="240" value="90">
+      <div class="beats" id="beats"></div>
+      <div class="row center">
+        <button id="bpmDown">−5</button>
+        <button class="primary" id="metToggle">Start</button>
+        <button id="bpmUp">+5</button>
+      </div>
+      <div class="field" style="margin-top:14px; max-width:160px; margin-left:auto; margin-right:auto;">
+        <label for="timeSig">Beats per measure</label>
+        <select id="timeSig">
+          <option>2</option>
+          <option>3</option>
+          <option selected>4</option>
+          <option>5</option>
+          <option>6</option>
+          <option>7</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- SESSION DETAILS / NOTES -->
+    <section class="card full" id="notes-card">
+      <h2>📝 Session Notes</h2>
+      <div class="field">
+        <label for="sessionTitle">What are you working on?</label>
+        <input type="text" id="sessionTitle" placeholder="e.g. Scales, Clarke Study #2, audition excerpts">
+      </div>
+      <div class="field">
+        <label for="sessionNotes">Notes</label>
+        <textarea id="sessionNotes" placeholder="Goals, tempos, what went well, what to fix next time…"></textarea>
+      </div>
+      <p class="empty">These are attached to your session when you hit <strong>Finish &amp; Log</strong>.</p>
+    </section>
+
+    <!-- RECORDING -->
+    <section class="card full" id="rec-card">
+      <h2>🎙️ Audio Recorder</h2>
+      <div class="row">
+        <button class="primary" id="recBtn">Record</button>
+        <button id="recStopBtn" disabled>Stop</button>
+        <span id="recStatus" class="li-meta" style="align-self:center;"></span>
+      </div>
+      <ul class="list" id="recList" style="margin-top:14px;"></ul>
+    </section>
+
+    <!-- STATS -->
+    <section class="card full">
+      <h2>📊 Totals</h2>
+      <div class="stats">
+        <div class="stat"><div class="num" id="statSessions">0</div><div class="lbl">Sessions</div></div>
+        <div class="stat"><div class="num" id="statTotal">0m</div><div class="lbl">Total time</div></div>
+        <div class="stat"><div class="num" id="statWeek">0m</div><div class="lbl">This week</div></div>
+        <div class="stat"><div class="num" id="statAvg">0m</div><div class="lbl">Avg session</div></div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="card full">
+      <h2>📚 Practice Log</h2>
+      <ul class="list" id="logList"></ul>
+      <button class="danger" id="clearLog" style="margin-top:6px;">Clear all sessions</button>
+      <a class="toolbar-link" href="index.html">← Back to home</a>
+    </section>
+
+  </div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    /* ---------------- Storage helpers ---------------- */
+    var LOG_KEY = "practiceLog.sessions";
+    function loadSessions() {
+      try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; }
+      catch (e) { return []; }
+    }
+    function saveSessions(s) { localStorage.setItem(LOG_KEY, JSON.stringify(s)); }
+
+    /* ---------------- Time formatting ---------------- */
+    function pad(n) { return n < 10 ? "0" + n : "" + n; }
+    function fmtClock(ms) {
+      var t = Math.floor(ms / 1000);
+      return pad(Math.floor(t / 3600)) + ":" + pad(Math.floor((t % 3600) / 60)) + ":" + pad(t % 60);
+    }
+    function fmtMins(ms) {
+      var m = Math.round(ms / 60000);
+      if (m < 60) return m + "m";
+      return Math.floor(m / 60) + "h " + (m % 60) + "m";
+    }
+
+    /* ---------------- Practice Timer ---------------- */
+    var timerDisplay = document.getElementById("timerDisplay");
+    var startBtn = document.getElementById("startBtn");
+    var pauseBtn = document.getElementById("pauseBtn");
+    var finishBtn = document.getElementById("finishBtn");
+
+    var elapsed = 0;        // accumulated ms while running
+    var runStart = 0;       // timestamp of current run segment
+    var ticking = null;
+
+    function currentElapsed() {
+      return elapsed + (runStart ? (Date.now() - runStart) : 0);
+    }
+    function renderTimer() { timerDisplay.textContent = fmtClock(currentElapsed()); }
+
+    function startTimer() {
+      if (runStart) return;
+      runStart = Date.now();
+      ticking = setInterval(renderTimer, 250);
+      startBtn.disabled = true;
+      pauseBtn.disabled = false;
+      finishBtn.disabled = false;
+    }
+    function pauseTimer() {
+      if (!runStart) return;
+      elapsed += Date.now() - runStart;
+      runStart = 0;
+      clearInterval(ticking);
+      startBtn.disabled = false;
+      startBtn.textContent = "Resume";
+      pauseBtn.disabled = true;
+      renderTimer();
+    }
+    function resetTimer() {
+      elapsed = 0; runStart = 0;
+      clearInterval(ticking);
+      startBtn.disabled = false;
+      startBtn.textContent = "Start";
+      pauseBtn.disabled = true;
+      finishBtn.disabled = true;
+      renderTimer();
+    }
+
+    startBtn.addEventListener("click", startTimer);
+    pauseBtn.addEventListener("click", pauseTimer);
+
+    finishBtn.addEventListener("click", function () {
+      var total = currentElapsed();
+      if (total < 1000) { resetTimer(); return; }
+      var title = document.getElementById("sessionTitle");
+      var notes = document.getElementById("sessionNotes");
+      var sessions = loadSessions();
+      sessions.unshift({
+        id: Date.now(),
+        date: new Date().toISOString(),
+        durationMs: total,
+        title: (title.value || "").trim() || "Practice session",
+        notes: (notes.value || "").trim(),
+        bpm: parseInt(bpmSlider.value, 10)
+      });
+      saveSessions(sessions);
+      title.value = "";
+      notes.value = "";
+      resetTimer();
+      renderLog();
+    });
+
+    /* ---------------- Metronome (Web Audio) ---------------- */
+    var audioCtx = null;
+    var bpmSlider = document.getElementById("bpmSlider");
+    var bpmVal = document.getElementById("bpmVal");
+    var metToggle = document.getElementById("metToggle");
+    var beatsEl = document.getElementById("beats");
+    var timeSig = document.getElementById("timeSig");
+
+    var metRunning = false;
+    var nextNoteTime = 0;
+    var beatIndex = 0;
+    var schedulerId = null;
+    var lookahead = 25;          // ms
+    var scheduleAhead = 0.1;     // s
+
+    function buildBeats() {
+      beatsEl.innerHTML = "";
+      var n = parseInt(timeSig.value, 10);
+      for (var i = 0; i < n; i++) {
+        var d = document.createElement("div");
+        d.className = "beat" + (i === 0 ? " accent" : "");
+        beatsEl.appendChild(d);
+      }
+    }
+
+    function highlightBeat(i) {
+      var nodes = beatsEl.children;
+      for (var k = 0; k < nodes.length; k++) nodes[k].classList.remove("on");
+      if (nodes[i]) nodes[i].classList.add("on");
+    }
+
+    function playClick(time, accent) {
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.frequency.value = accent ? 1500 : 900;
+      gain.gain.setValueAtTime(accent ? 0.6 : 0.35, time);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.05);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(time);
+      osc.stop(time + 0.06);
+    }
+
+    function scheduler() {
+      var beatsPerMeasure = parseInt(timeSig.value, 10);
+      while (nextNoteTime < audioCtx.currentTime + scheduleAhead) {
+        var accent = beatIndex === 0;
+        playClick(nextNoteTime, accent);
+        var thisBeat = beatIndex;
+        var delay = (nextNoteTime - audioCtx.currentTime) * 1000;
+        setTimeout(function (b) { return function () { highlightBeat(b); }; }(thisBeat), Math.max(0, delay));
+        var secondsPerBeat = 60.0 / parseInt(bpmSlider.value, 10);
+        nextNoteTime += secondsPerBeat;
+        beatIndex = (beatIndex + 1) % beatsPerMeasure;
+      }
+    }
+
+    function startMet() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      metRunning = true;
+      beatIndex = 0;
+      nextNoteTime = audioCtx.currentTime + 0.05;
+      schedulerId = setInterval(scheduler, lookahead);
+      metToggle.textContent = "Stop";
+      metToggle.classList.remove("primary");
+      metToggle.classList.add("warn");
+    }
+    function stopMet() {
+      metRunning = false;
+      clearInterval(schedulerId);
+      highlightBeat(-1);
+      metToggle.textContent = "Start";
+      metToggle.classList.add("primary");
+      metToggle.classList.remove("warn");
+    }
+
+    metToggle.addEventListener("click", function () { metRunning ? stopMet() : startMet(); });
+
+    function setBpm(v) {
+      v = Math.min(240, Math.max(30, v));
+      bpmSlider.value = v;
+      bpmVal.textContent = v;
+    }
+    bpmSlider.addEventListener("input", function () { bpmVal.textContent = bpmSlider.value; });
+    document.getElementById("bpmUp").addEventListener("click", function () { setBpm(parseInt(bpmSlider.value, 10) + 5); });
+    document.getElementById("bpmDown").addEventListener("click", function () { setBpm(parseInt(bpmSlider.value, 10) - 5); });
+    timeSig.addEventListener("change", function () { buildBeats(); beatIndex = 0; });
+    buildBeats();
+
+    /* ---------------- Audio Recorder ---------------- */
+    var recBtn = document.getElementById("recBtn");
+    var recStopBtn = document.getElementById("recStopBtn");
+    var recStatus = document.getElementById("recStatus");
+    var recList = document.getElementById("recList");
+
+    var mediaRecorder = null;
+    var chunks = [];
+    var recStartTime = 0;
+    var recordings = []; // in-memory only (object URLs); not persisted across reloads
+
+    recBtn.addEventListener("click", function () {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        recStatus.textContent = "Recording not supported in this browser.";
+        return;
+      }
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+        chunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = function (e) { if (e.data.size > 0) chunks.push(e.data); };
+        mediaRecorder.onstop = function () {
+          var blob = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
+          var url = URL.createObjectURL(blob);
+          recordings.unshift({
+            url: url,
+            time: new Date(),
+            durationMs: Date.now() - recStartTime
+          });
+          stream.getTracks().forEach(function (t) { t.stop(); });
+          renderRecordings();
+          recStatus.textContent = "";
+        };
+        mediaRecorder.start();
+        recStartTime = Date.now();
+        recBtn.disabled = true;
+        recStopBtn.disabled = false;
+        recStatus.innerHTML = '<span class="rec-dot"></span> Recording…';
+      }).catch(function () {
+        recStatus.textContent = "Microphone access denied.";
+      });
+    });
+
+    recStopBtn.addEventListener("click", function () {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+      recBtn.disabled = false;
+      recStopBtn.disabled = true;
+    });
+
+    function renderRecordings() {
+      recList.innerHTML = "";
+      if (!recordings.length) {
+        recList.innerHTML = '<li class="empty">No recordings yet. Recordings stay until you reload the page.</li>';
+        return;
+      }
+      recordings.forEach(function (r, i) {
+        var li = document.createElement("li");
+        var head = document.createElement("div");
+        head.className = "li-head";
+        head.innerHTML = '<span class="li-title">Take ' + (recordings.length - i) + '</span>' +
+          '<span class="li-meta">' + r.time.toLocaleTimeString() + ' · ' + fmtClock(r.durationMs) + '</span>';
+        var audio = document.createElement("audio");
+        audio.controls = true;
+        audio.src = r.url;
+        var dl = document.createElement("a");
+        dl.href = r.url;
+        dl.download = "practice-take-" + (recordings.length - i) + ".webm";
+        dl.textContent = "Download";
+        dl.className = "toolbar-link";
+        dl.style.marginRight = "12px";
+        var del = document.createElement("button");
+        del.className = "danger";
+        del.textContent = "Delete";
+        del.style.marginTop = "8px";
+        del.addEventListener("click", function () {
+          URL.revokeObjectURL(r.url);
+          recordings.splice(i, 1);
+          renderRecordings();
+        });
+        li.appendChild(head);
+        li.appendChild(audio);
+        var actions = document.createElement("div");
+        actions.appendChild(dl);
+        actions.appendChild(del);
+        li.appendChild(actions);
+        recList.appendChild(li);
+      });
+    }
+    renderRecordings();
+
+    /* ---------------- Log + Stats rendering ---------------- */
+    var logList = document.getElementById("logList");
+
+    function renderStats(sessions) {
+      var total = sessions.reduce(function (a, s) { return a + s.durationMs; }, 0);
+      var weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+      var week = sessions.filter(function (s) { return new Date(s.date).getTime() >= weekAgo; })
+                         .reduce(function (a, s) { return a + s.durationMs; }, 0);
+      document.getElementById("statSessions").textContent = sessions.length;
+      document.getElementById("statTotal").textContent = fmtMins(total);
+      document.getElementById("statWeek").textContent = fmtMins(week);
+      document.getElementById("statAvg").textContent = sessions.length ? fmtMins(total / sessions.length) : "0m";
+    }
+
+    function renderLog() {
+      var sessions = loadSessions();
+      renderStats(sessions);
+      logList.innerHTML = "";
+      if (!sessions.length) {
+        logList.innerHTML = '<li class="empty">No sessions logged yet. Start the timer and hit Finish &amp; Log.</li>';
+        return;
+      }
+      sessions.forEach(function (s) {
+        var li = document.createElement("li");
+        var d = new Date(s.date);
+        var meta = d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) +
+          " · " + fmtClock(s.durationMs) + (s.bpm ? " · " + s.bpm + " BPM" : "");
+        var head = document.createElement("div");
+        head.className = "li-head";
+        head.innerHTML = '<span class="li-title"></span><span class="li-meta">' + meta + '</span>';
+        head.querySelector(".li-title").textContent = s.title;
+        li.appendChild(head);
+        if (s.notes) {
+          var n = document.createElement("div");
+          n.className = "li-notes";
+          n.textContent = s.notes;
+          li.appendChild(n);
+        }
+        var del = document.createElement("button");
+        del.className = "danger";
+        del.textContent = "Delete";
+        del.style.marginTop = "8px";
+        del.addEventListener("click", function () {
+          var all = loadSessions().filter(function (x) { return x.id !== s.id; });
+          saveSessions(all);
+          renderLog();
+        });
+        li.appendChild(del);
+        logList.appendChild(li);
+      });
+    }
+
+    document.getElementById("clearLog").addEventListener("click", function () {
+      if (confirm("Delete all logged sessions? This cannot be undone.")) {
+        saveSessions([]);
+        renderLog();
+      }
+    });
+
+    renderTimer();
+    renderLog();
+  })();
+  </script>
+</body>
+
+</html>
