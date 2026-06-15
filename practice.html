@@ -146,6 +146,24 @@
 
     .empty { color: var(--muted); font-style: italic; font-size: .9rem; }
 
+    .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .tag {
+      font-size: .74rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+    .filter-bar .lbl { color: var(--muted); font-size: .8rem; margin-right: 2px; }
+    .tag-filter {
+      font: inherit; font-size: .8rem; cursor: pointer;
+      background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+      padding: 3px 10px; border-radius: 999px;
+    }
+    .tag-filter.active { background: var(--accent); border-color: var(--accent); color: #06121f; font-weight: 600; }
+
     .stats { display: flex; gap: 18px; flex-wrap: wrap; }
     .stat { flex: 1; min-width: 120px; text-align: center; }
     .stat .num { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
@@ -215,6 +233,10 @@
         <input type="text" id="sessionTitle" placeholder="e.g. Scales, Clarke Study #2, audition excerpts">
       </div>
       <div class="field">
+        <label for="sessionTags">Tags <span style="color:var(--muted)">(comma separated)</span></label>
+        <input type="text" id="sessionTags" placeholder="e.g. scales, etudes, audition">
+      </div>
+      <div class="field">
         <label for="sessionNotes">Notes</label>
         <textarea id="sessionNotes" placeholder="Goals, tempos, what went well, what to fix next time…"></textarea>
       </div>
@@ -246,6 +268,7 @@
     <!-- HISTORY -->
     <section class="card full">
       <h2>📚 Practice Log</h2>
+      <div class="filter-bar" id="filterBar"></div>
       <ul class="list" id="logList"></ul>
       <button class="danger" id="clearLog" style="margin-top:6px;">Clear all sessions</button>
       <a class="toolbar-link" href="index.html">← Back to home</a>
@@ -264,6 +287,15 @@
       catch (e) { return []; }
     }
     function saveSessions(s) { localStorage.setItem(LOG_KEY, JSON.stringify(s)); }
+
+    function parseTags(str) {
+      var seen = {};
+      return (str || "").split(",").map(function (t) { return t.trim().toLowerCase(); })
+        .filter(function (t) {
+          if (!t || seen[t]) return false;
+          seen[t] = true; return true;
+        });
+    }
 
     /* ---------------- Time formatting ---------------- */
     function pad(n) { return n < 10 ? "0" + n : "" + n; }
@@ -328,6 +360,7 @@
       if (total < 1000) { resetTimer(); return; }
       var title = document.getElementById("sessionTitle");
       var notes = document.getElementById("sessionNotes");
+      var tagsInput = document.getElementById("sessionTags");
       var sessions = loadSessions();
       sessions.unshift({
         id: Date.now(),
@@ -335,11 +368,13 @@
         durationMs: total,
         title: (title.value || "").trim() || "Practice session",
         notes: (notes.value || "").trim(),
+        tags: parseTags(tagsInput.value),
         bpm: parseInt(bpmSlider.value, 10)
       });
       saveSessions(sessions);
       title.value = "";
       notes.value = "";
+      tagsInput.value = "";
       resetTimer();
       renderLog();
     });
@@ -524,6 +559,34 @@
 
     /* ---------------- Log + Stats rendering ---------------- */
     var logList = document.getElementById("logList");
+    var filterBar = document.getElementById("filterBar");
+    var activeTag = null;
+
+    function renderFilterBar(sessions) {
+      var counts = {};
+      sessions.forEach(function (s) {
+        (s.tags || []).forEach(function (t) { counts[t] = (counts[t] || 0) + 1; });
+      });
+      var tags = Object.keys(counts).sort();
+      filterBar.innerHTML = "";
+      if (!tags.length) { activeTag = null; return; }
+      // If the active tag no longer exists, clear it.
+      if (activeTag && tags.indexOf(activeTag) === -1) activeTag = null;
+      var lbl = document.createElement("span");
+      lbl.className = "lbl";
+      lbl.textContent = "Filter:";
+      filterBar.appendChild(lbl);
+      makeFilterBtn("All", null);
+      tags.forEach(function (t) { makeFilterBtn(t + " (" + counts[t] + ")", t); });
+    }
+
+    function makeFilterBtn(label, tag) {
+      var b = document.createElement("button");
+      b.className = "tag-filter" + ((tag === activeTag) ? " active" : "");
+      b.textContent = label;
+      b.addEventListener("click", function () { activeTag = tag; renderLog(); });
+      filterBar.appendChild(b);
+    }
 
     function renderStats(sessions) {
       var total = sessions.reduce(function (a, s) { return a + s.durationMs; }, 0);
@@ -539,12 +602,20 @@
     function renderLog() {
       var sessions = loadSessions();
       renderStats(sessions);
+      renderFilterBar(sessions);
       logList.innerHTML = "";
       if (!sessions.length) {
         logList.innerHTML = '<li class="empty">No sessions logged yet. Start the timer and hit Finish &amp; Log.</li>';
         return;
       }
-      sessions.forEach(function (s) {
+      var shown = activeTag
+        ? sessions.filter(function (s) { return (s.tags || []).indexOf(activeTag) !== -1; })
+        : sessions;
+      if (!shown.length) {
+        logList.innerHTML = '<li class="empty">No sessions tagged &ldquo;' + activeTag + '&rdquo;.</li>';
+        return;
+      }
+      shown.forEach(function (s) {
         var li = document.createElement("li");
         var d = new Date(s.date);
         var meta = d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) +
@@ -559,6 +630,19 @@
           n.className = "li-notes";
           n.textContent = s.notes;
           li.appendChild(n);
+        }
+        if (s.tags && s.tags.length) {
+          var tagWrap = document.createElement("div");
+          tagWrap.className = "tags";
+          s.tags.forEach(function (t) {
+            var chip = document.createElement("button");
+            chip.className = "tag";
+            chip.textContent = t;
+            chip.title = "Filter by " + t;
+            chip.addEventListener("click", function () { activeTag = t; renderLog(); });
+            tagWrap.appendChild(chip);
+          });
+          li.appendChild(tagWrap);
         }
         var del = document.createElement("button");
         del.className = "danger";
